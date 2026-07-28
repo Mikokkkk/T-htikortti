@@ -1,0 +1,75 @@
+{
+  "name": "Tähtikortti — Daily Restaurant Outreach",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [ { "field": "cronExpression", "expression": "0 9 * * 1-5" } ] } },
+      "id": "schedule",
+      "name": "Every weekday 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [ 240, 300 ]
+    },
+    {
+      "parameters": {
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-Goog-Api-Key", "value": "={{ $env.GOOGLE_PLACES_API_KEY }}" },
+          { "name": "X-Goog-FieldMask", "value": "places.displayName,places.websiteUri,places.nationalPhoneNumber,places.formattedAddress" }
+        ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"textQuery\": \"ravintola Helsinki\", \"pageSize\": 20 }"
+      },
+      "id": "scrape",
+      "name": "Find restaurants (Google Places)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 460, 300 ],
+      "notes": "Returns up to 20 per call. Loop / paginate to reach ~100. You must supply your own emails source; Places does not return email — enrich via the site or a verifier."
+    },
+    {
+      "parameters": { "fieldToSplitOut": "places", "options": {} },
+      "id": "split",
+      "name": "Split to items",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [ 680, 300 ]
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false }, "combinator": "and",
+          "conditions": [ { "leftValue": "={{ $json.websiteUri }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } } ] }
+      },
+      "id": "filter",
+      "name": "Has website",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [ 900, 300 ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $json.displayName?.text }} — helppo tapa saada lisää Google-arvosteluja",
+        "emailType": "html",
+        "message": "=<p>Hei {{ $json.displayName?.text }}n väki,</p><p>huomasimme teidät paikallisesti ja halusimme jakaa pienen idean näkyvyyteen: <b>Tähtikortti</b> — NFC/QR-kortti, jolla asiakkaanne jättää Google-arvostelun yhdellä napautuksella. Katso: https://tahtikortti.vercel.app</p><p>Ei sitoumusta — vastaa viestiin, niin kerron lisää.<br>Arttu &amp; Miko · Tähtikortti</p><p><small>Et halua viestejä? Vastaa POISTA.</small></p>",
+        "options": { "sendTo": "={{ $json.email || '' }}" }
+      },
+      "id": "gmail",
+      "name": "Create Gmail DRAFT (review first)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [ 1120, 300 ],
+      "notes": "SAFE MODE: creates a draft you review before sending. To auto-send, change resource to 'message' and operation to 'send' — but ONLY from a warmed, authenticated domain inbox, throttled, to Oy/Oyj recipients, with opt-out. See DELIVERABILITY-ASSESSMENT.md."
+    }
+  ],
+  "connections": {
+    "Every weekday 09:00": { "main": [ [ { "node": "Find restaurants (Google Places)", "type": "main", "index": 0 } ] ] },
+    "Find restaurants (Google Places)": { "main": [ [ { "node": "Split to items", "type": "main", "index": 0 } ] ] },
+    "Split to items": { "main": [ [ { "node": "Has website", "type": "main", "index": 0 } ] ] },
+    "Has website": { "main": [ [ { "node": "Create Gmail DRAFT (review first)", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": {},
+  "_README": "Import into n8n (Workflows → Import from File). Set credentials: Gmail OAuth2, and env GOOGLE_PLACES_API_KEY. Google Places does NOT return email addresses — add an email-enrichment step (scrape the website's contact page or use a verifier) before the Gmail node. DEFAULT is DRAFT mode for legal + deliverability safety. Do not auto-send 100 cold emails/day from a personal Gmail — read DELIVERABILITY-ASSESSMENT.md first."
+}
