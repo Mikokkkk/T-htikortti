@@ -56,7 +56,7 @@
   .modal-grid .card{background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:none}
   .modal-grid h3{margin-top:0;margin-bottom:10px;font-size:1.1rem;color:var(--text)}
   .modal-close{position:absolute;top:18px;right:18px;border:none;background:none;color:var(--muted);font-size:1.25rem;cursor:pointer;line-height:1}
-  @media(max-width:700px){.modal{padding:24px}.modal-grid{gap:16px}}   
+  @media(max-width:700px){.modal{padding:24px}.modal-grid{gap:16px}.nav{justify-content:flex-start}.nav .center-link{position:static;transform:none;margin-left:auto}.nav a.cta{display:none}}   
   /* HERO */
   .hero{padding:88px 0 72px;text-align:center;
     background:linear-gradient(180deg,var(--sky) 0%,var(--bg-soft) 45%,#fff 100%)}
@@ -377,16 +377,18 @@
     const list = document.querySelector('.rs-list');
     const track = document.querySelector('.rs-track');
     if(!list || !track) return;
-    // duplicate items for seamless loop
-    list.innerHTML = list.innerHTML + list.innerHTML;
-    // compute total width and set animation duration (px per second)
+    const originalHTML = list.innerHTML;
     function startMarquee(){
-      // allow layout to settle
-      const totalWidth = list.scrollWidth / 2; // original content width (px)
+      // restore original items before duplicating
+      list.innerHTML = originalHTML;
+      const originalWidth = list.scrollWidth;
+      while(list.scrollWidth < track.clientWidth + originalWidth){
+        list.innerHTML += originalHTML;
+      }
       // set CSS variable used by keyframes for precise pixel translation
-      list.style.setProperty('--marq-distance', totalWidth + 'px');
+      list.style.setProperty('--marq-distance', originalWidth + 'px');
       const speed = 60; // pixels per second
-      const duration = Math.max(8, Math.round(totalWidth / speed));
+      const duration = Math.max(8, Math.round(originalWidth / speed));
       list.style.animation = `scroll-left ${duration}s linear infinite`;
     }
     // restart on resize
